@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToDo-App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        nav {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        nav button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        nav button:hover {
+            background-color: #0056b3;
+        }
+        .section {
+            display: none;
+        }
+        .section.active {
+            display: block;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"], input[type="date"], select {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #49ce49;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        li button {
+            margin-left: 10px;
+            background-color: #d9534f;
+            border: none;
+            padding: 5px 10px;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        li button.edit {
+            background-color: #5bc0de;
+        }
+        li button.edit:hover {
+            background-color: #31b0d5;
+        }
+        li button.delete:hover {
+            background-color: #c9302c;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+        .modal.active {
+            display: block;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .modal-header h2 {
+            margin: 0;
+        }
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ToDo-App</h1>
+        <nav>
+            <button onclick="showSection('tasks')">Aufgaben</button>
+            <button onclick="showSection('persons')">Personen</button>
+        </nav>
+
+        <div id="tasks" class="section active">
+            <form id="todo-form">
+                <input type="text" id="todo-input" placeholder="Neue Aufgabe hinzufügen...">
+                <select id="person-select">
+                    <option value="">Person wählen...</option>
+                </select>
+                <input type="date" id="todo-date">
+                <button type="submit">Hinzufügen</button>
+            </form>
+            <ul id="todo-list"></ul>
+        </div>
+
+        <div id="persons" class="section">
+            <form id="person-form">
+                <input type="text" id="person-input" placeholder="Neue Person hinzufügen...">
+                <button type="submit">Hinzufügen</button>
+            </form>
+            <ul id="person-list"></ul>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal">
+        <div class="modal-header">
+            <h2>Bearbeitungsmenü</h2>
+            <button onclick="closeModal()">X</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" id="edit-task" placeholder="Aufgabe...">
+            <select id="edit-person">
+                <option value="">Person wählen...</option>
+            </select>
+            <input type="date" id="edit-date">
+            <button onclick="saveEdits()">Speichern</button>
+        </div>
+    </div>
+
+    <script>
+        // Referenzen zu DOM-Elementen
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
+        const todoDate = document.getElementById('todo-date');
+        const todoList = document.getElementById('todo-list');
+        const personSelect = document.getElementById('person-select');
+
+        const personForm = document.getElementById('person-form');
+        const personInput = document.getElementById('person-input');
+        const personList = document.getElementById('person-list');
+
+        const sections = document.querySelectorAll('.section');
+
+        const editModal = document.getElementById('edit-modal');
+        const editTaskInput = document.getElementById('edit-task');
+        const editPersonSelect = document.getElementById('edit-person');
+        const editDateInput = document.getElementById('edit-date');
+
+        let currentEditItem = null;
+
+        // Funktion zum Wechseln der Abschnitte
+        function showSection(id) {
+            sections.forEach(section => {
+                section.classList.remove('active');
+                if (section.id === id) {
+                    section.classList.add('active');
+                }
+            });
+        }
+
+        // Funktion zum Aktualisieren der Personenauswahl im Bearbeitungsmenü
+        function updateEditPersonSelect() {
+            editPersonSelect.innerHTML = personSelect.innerHTML;
+        }
+
+        // Funktion zum Öffnen des Bearbeitungsmenüs
+        function openEditModal(taskItem) {
+            currentEditItem = taskItem;
+            const [taskText, details] = taskItem.firstChild.textContent.split(' (');
+            const [, personDetails, dateDetails] = details.match(/Zugewiesen an: (.*), Fällig am: (.*)\)/);
+
+            editTaskInput.value = taskText;
+            editPersonSelect.value = personDetails;
+            editDateInput.value = dateDetails;
+
+            updateEditPersonSelect();
+            editModal.classList.add('active');
+        }
+
+        // Funktion zum Schließen des Bearbeitungsmenüs
+        function closeModal() {
+            editModal.classList.remove('active');
+        }
+
+        // Funktion zum Speichern der Bearbeitungen
+        function saveEdits() {
+            const newTask = editTaskInput.value.trim();
+            const newPerson = editPersonSelect.value;
+            const newDate = editDateInput.value;
+
+            if (newTask && newPerson && newDate) {
+                currentEditItem.firstChild.textContent = `${newTask} (Zugewiesen an: ${newPerson}, Fällig am: ${newDate})`;
+                closeModal();
+            } else {
+                alert('Bitte füllen Sie alle Felder aus.');
+            }
+        }
+
+        // Event-Listener für das Aufgabenformular
+        todoForm.addEventListener('submit', function(event) {
+            event.preventDefault(); // Verhindert das Neuladen der Seite
+            const task = todoInput.value.trim();
+            const person = personSelect.value;
+            const dueDate = todoDate.value;
+
+            if (task !== '' && person !== '' && dueDate !== '') {
+                addTask(task, person, dueDate);
+                todoInput.value = '';
+                todoDate.value = '';
+            } else {
+                alert('Bitte füllen Sie alle Felder aus.');
+            }
+        });
+
+        // Event-Listener für das Personenformular
+        personForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const person = personInput.value.trim();
+            if (person !== '') {
+                addPerson(person);
+                personInput.value = '';
+            }
+        });
+
+        // Funktion zum Hinzufügen einer Aufgabe
+        function addTask(task, person, dueDate) {
+            const li = document.createElement('li');
+
+            const taskSpan = document.createElement('span');
+            taskSpan.textContent = `${task} (Zugewiesen an: ${person}, Fällig am: ${dueDate})`;
+
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Bearbeiten';
+            editButton.classList.add('edit');
+            editButton.addEventListener('click', function() {
+                openEditModal(li);
+            });
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Löschen';
+            deleteButton.classList.add('delete');
+            deleteButton.addEventListener('click', function() {
+                todoList.removeChild(li);
+            });
+
+            li.appendChild(taskSpan);
+            li.appendChild(editButton);
+            li.appendChild(deleteButton);
+            todoList.appendChild(li);
+        }
+
+        // Funktion zum Hinzufügen einer Person
+        function addPerson(person) {
+            const option = document.createElement('option');
+            option.value = person;
+            option.textContent = person;
+            personSelect.appendChild(option);
+            updateEditPersonSelect();
+
+            const li = document.createElement('li');
+            li.textContent = person;
+            personList.appendChild(li);
+        }
+    </script>
+</body>
+</html>
